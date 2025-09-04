@@ -1,5 +1,11 @@
 package com.maximilien0405.androidrelaunch;
 
+import android.content.Context;
+import android.content.Intent;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -9,14 +15,75 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "AndroidRelaunch")
 public class AndroidRelaunchPlugin extends Plugin {
 
-    private AndroidRelaunch implementation = new AndroidRelaunch();
+    private static boolean isEnabled = false;
+    private static AndroidRelaunchPlugin pluginInstance;
 
-    @PluginMethod
-    public void echo(PluginCall call) {
-        String value = call.getString("value");
+    // Initialize plugin instance reference when plugin loads
+    @Override
+    public void load() {
+        super.load();
+        pluginInstance = this;
+    }
 
-        JSObject ret = new JSObject();
-        ret.put("value", implementation.echo(value));
-        call.resolve(ret);
+    // Enable the relaunch mechanism by starting the foreground service
+    @com.getcapacitor.PluginMethod
+    public void enable(PluginCall call) {
+        try {
+            Context context = getContext();
+            Intent serviceIntent = new Intent(context, KeepAliveService.class);
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent);
+            } else {
+                context.startService(serviceIntent);
+            }
+            
+            isEnabled = true;
+            call.resolve();
+        } catch (SecurityException e) {
+            call.reject("Permission denied: " + e.getMessage(), e);
+        } catch (Exception e) {
+            call.reject("Failed to enable relaunch service: " + e.getMessage(), e);
+        }
+    }
+
+    // Disable the relaunch mechanism by stopping the foreground service
+    @com.getcapacitor.PluginMethod
+    public void disable(PluginCall call) {
+        try {
+            Context context = getContext();
+            Intent serviceIntent = new Intent(context, KeepAliveService.class);
+            boolean stopped = context.stopService(serviceIntent);
+            isEnabled = false;
+            
+            if (stopped) {
+                call.resolve();
+            } else {
+                call.reject("Service was not running or could not be stopped");
+            }
+        } catch (Exception e) {
+            call.reject("Failed to disable relaunch service: " + e.getMessage(), e);
+        }
+    }
+
+    // Check if the relaunch mechanism is currently enabled
+    public static boolean isEnabled() {
+        return isEnabled;
+    }
+
+    // Get the current plugin instance for service communication
+    public static AndroidRelaunchPlugin getPluginInstance() {
+        return pluginInstance;
+    }
+
+    // Notify JavaScript listeners about app relaunch events
+    public void notifyRelaunch() {
+        try {
+            JSObject data = new JSObject();
+            data.put("relaunch", true);
+            notifyListeners("relaunch", data);
+        } catch (Exception e) {
+            System.err.println("Failed to notify relaunch: " + e.getMessage());
+        }
     }
 }
