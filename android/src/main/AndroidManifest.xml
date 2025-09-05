@@ -1,13 +1,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     
-    <service
-        android:name="com.maximilien0405.androidrelaunch.KeepAliveService"
-        android:enabled="true"
-        android:exported="true"
-        android:foregroundServiceType="dataSync"
-        android:description="@string/relaunch_service_description" />
+    <application
+        android:allowBackup="true">
+        <service
+            android:name="com.maximilien0405.androidrelaunch.KeepAliveService"
+            android:enabled="true"
+            android:exported="true"
+            android:foregroundServiceType="dataSync" />
+    </application>
 </manifest>

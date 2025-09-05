@@ -1,4 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="relaunch_service_description">Keeps the app alive and automatically relaunches it if killed</string>
-</resources>

@@ -28,7 +28,6 @@ public class KeepAliveService extends Service {
         super.onCreate();
         try {
             createNotificationChannel();
-            startForegroundWithNotification();
             startHeartbeat();
         } catch (Exception e) {
             Log.e(TAG, "Failed to create service: " + e.getMessage(), e);
@@ -39,6 +38,14 @@ public class KeepAliveService extends Service {
     // Handle service start command with sticky restart behavior
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        try {
+            // Immediately start foreground to avoid timeout
+            startForegroundWithNotification();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to start foreground in onStartCommand: " + e.getMessage(), e);
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         return START_STICKY;
     }
 
@@ -72,23 +79,36 @@ public class KeepAliveService extends Service {
     // Start foreground service with persistent notification
     private void startForegroundWithNotification() {
         try {
+            // Ensure notification channel exists before creating notification
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                createNotificationChannel();
+            }
+            
             // Create notification compatible with API 23+
             NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
                     .setContentTitle("App is active")
                     .setContentText("Monitoring app to keep it alive")
                     .setSmallIcon(android.R.drawable.ic_media_play)
                     .setPriority(NotificationCompat.PRIORITY_LOW)
-                    .setOngoing(true);
+                    .setOngoing(true)
+                    .setAutoCancel(false);
 
             // Set category for API 24+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 builder.setCategory(NotificationCompat.CATEGORY_SERVICE);
             }
 
+            // For API 26+, set importance
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                builder.setChannelId(CHANNEL_ID);
+            }
+
             Notification notification = builder.build();
             startForeground(1, notification);
+            Log.d(TAG, "Foreground service started successfully");
         } catch (Exception e) {
             Log.e(TAG, "Failed to start foreground: " + e.getMessage(), e);
+            throw e; // Re-throw to handle in onStartCommand
         }
     }
 
@@ -107,6 +127,18 @@ public class KeepAliveService extends Service {
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
+                NotificationManager manager = getSystemService(NotificationManager.class);
+                if (manager == null) {
+                    Log.e(TAG, "NotificationManager is null");
+                    return;
+                }
+                
+                // Check if channel already exists
+                if (manager.getNotificationChannel(CHANNEL_ID) != null) {
+                    Log.d(TAG, "Notification channel already exists");
+                    return;
+                }
+                
                 NotificationChannel serviceChannel = new NotificationChannel(
                         CHANNEL_ID,
                         "Android Relaunch Service",
@@ -116,13 +148,15 @@ public class KeepAliveService extends Service {
                 
                 // Set sound to null for API 26+
                 serviceChannel.setSound(null, null);
+                serviceChannel.setShowBadge(false);
+                serviceChannel.enableLights(false);
+                serviceChannel.enableVibration(false);
                 
-                NotificationManager manager = getSystemService(NotificationManager.class);
-                if (manager != null) {
-                    manager.createNotificationChannel(serviceChannel);
-                }
+                manager.createNotificationChannel(serviceChannel);
+                Log.d(TAG, "Notification channel created successfully");
             } catch (Exception e) {
                 Log.e(TAG, "Failed to create notification channel: " + e.getMessage(), e);
+                throw e; // Re-throw to handle in calling method
             }
         }
     }

@@ -30,6 +30,11 @@ public class AndroidRelaunchPlugin extends Plugin {
     public void enable(PluginCall call) {
         try {
             Context context = getContext();
+            if (context == null) {
+                call.reject("Context is null - cannot start service");
+                return;
+            }
+            
             Intent serviceIntent = new Intent(context, KeepAliveService.class);
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -41,7 +46,9 @@ public class AndroidRelaunchPlugin extends Plugin {
             isEnabled = true;
             call.resolve();
         } catch (SecurityException e) {
-            call.reject("Permission denied: " + e.getMessage(), e);
+            call.reject("Permission denied: " + e.getMessage() + ". Make sure FOREGROUND_SERVICE permission is granted.", e);
+        } catch (IllegalStateException e) {
+            call.reject("Cannot start foreground service: " + e.getMessage() + ". App may be in background.", e);
         } catch (Exception e) {
             call.reject("Failed to enable relaunch service: " + e.getMessage(), e);
         }

@@ -1,6 +1,6 @@
 {
   "name": "@maximilien0405/capacitor-android-relaunch",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Capacitor plugin that keeps your Android app alive with foreground service and auto-relaunch capabilities",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
@@ -70,9 +70,6 @@
     "extends": "@ionic/eslint-config/recommended"
   },
   "capacitor": {
-    "ios": {
-      "src": "ios"
-    },
     "android": {
       "src": "android"
     }
