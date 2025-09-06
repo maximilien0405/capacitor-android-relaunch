@@ -4,11 +4,13 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.PowerManager;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
@@ -18,19 +20,33 @@ public class KeepAliveService extends Service {
 
     private static final String TAG = "KeepAliveService";
     private static final String CHANNEL_ID = "AndroidRelaunchChannel";
+    private static final int HEARTBEAT_INTERVAL = 30000;
+    private static final int RELAUNCH_DELAY = 3000;
+    
     private Handler handler = new Handler();
     private Runnable heartbeatRunnable;
     private boolean isDestroyed = false;
+    private boolean isServiceRunning = false;
 
     // Initialize service and start monitoring
     @Override
     public void onCreate() {
         super.onCreate();
         try {
+            // Prevent multiple service instances
+            if (isServiceRunning) {
+                Log.w(TAG, "Service already running, stopping duplicate instance");
+                stopSelf();
+                return;
+            }
+            
+            isServiceRunning = true;
             createNotificationChannel();
             startHeartbeat();
+            Log.d(TAG, "KeepAliveService created successfully");
         } catch (Exception e) {
             Log.e(TAG, "Failed to create service: " + e.getMessage(), e);
+            isServiceRunning = false;
             stopSelf();
         }
     }
@@ -54,18 +70,22 @@ public class KeepAliveService extends Service {
     public void onDestroy() {
         super.onDestroy();
         isDestroyed = true;
+        isServiceRunning = false;
         
+        // Clean up handler
         if (handler != null && heartbeatRunnable != null) {
             handler.removeCallbacks(heartbeatRunnable);
         }
 
+
         if (AndroidRelaunchPlugin.isEnabled()) {
-            // Relaunch the app after 3s if killed
+            // Relaunch the app after delay if killed
             new Handler().postDelayed(() -> {
                 if (!isDestroyed && AndroidRelaunchPlugin.isEnabled()) {
+                    Log.d(TAG, "Attempting to relaunch app after service destruction");
                     relaunchApp();
                 }
-            }, 3000);
+            }, RELAUNCH_DELAY);
         }
     }
 
@@ -115,9 +135,9 @@ public class KeepAliveService extends Service {
     // Start heartbeat monitoring to check app process
     private void startHeartbeat() {
         try {
-            // Heartbeat to check if app is alive
             heartbeatRunnable = this::checkAppAlive;
-            handler.postDelayed(heartbeatRunnable, 30000);
+            handler.postDelayed(heartbeatRunnable, HEARTBEAT_INTERVAL);
+            Log.d(TAG, "Heartbeat monitoring started");
         } catch (Exception e) {
             Log.e(TAG, "Failed to start heartbeat: " + e.getMessage(), e);
         }
@@ -176,7 +196,7 @@ public class KeepAliveService extends Service {
             }
             
             if (!isDestroyed && handler != null && heartbeatRunnable != null && AndroidRelaunchPlugin.isEnabled()) {
-                handler.postDelayed(heartbeatRunnable, 30000);
+                handler.postDelayed(heartbeatRunnable, HEARTBEAT_INTERVAL);
             }
         } catch (Exception e) {
             Log.e(TAG, "Error in heartbeat check: " + e.getMessage(), e);

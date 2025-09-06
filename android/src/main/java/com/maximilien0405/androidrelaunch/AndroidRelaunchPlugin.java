@@ -14,7 +14,6 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 @CapacitorPlugin(name = "AndroidRelaunch")
 public class AndroidRelaunchPlugin extends Plugin {
-
     private static boolean isEnabled = false;
     private static AndroidRelaunchPlugin pluginInstance;
 
@@ -32,6 +31,12 @@ public class AndroidRelaunchPlugin extends Plugin {
             Context context = getContext();
             if (context == null) {
                 call.reject("Context is null - cannot start service");
+                return;
+            }
+            
+            // Check if already enabled
+            if (isEnabled) {
+                call.resolve();
                 return;
             }
             
@@ -59,10 +64,15 @@ public class AndroidRelaunchPlugin extends Plugin {
     public void disable(PluginCall call) {
         try {
             Context context = getContext();
+            if (context == null) {
+                call.reject("Context is null - cannot stop service");
+                return;
+            }
+            
             Intent serviceIntent = new Intent(context, KeepAliveService.class);
             boolean stopped = context.stopService(serviceIntent);
             isEnabled = false;
-            
+                        
             if (stopped) {
                 call.resolve();
             } else {
@@ -90,7 +100,6 @@ public class AndroidRelaunchPlugin extends Plugin {
             data.put("relaunch", true);
             notifyListeners("relaunch", data);
         } catch (Exception e) {
-            System.err.println("Failed to notify relaunch: " + e.getMessage());
         }
     }
 }
